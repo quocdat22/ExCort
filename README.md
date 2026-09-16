@@ -17,22 +17,21 @@ retrieval và generation, không sử dụng LangChain hoặc LlamaIndex.
 
 ## Kiến trúc
 
-```text
-data/raw/demo.pdf
-        │
-        ▼
-PyMuPDF parser ──► tiktoken chunking ──► Jina embeddings
-                                                │
-                                                ▼
-                                            ChromaDB
-                                                │
-Question ──► Jina query embedding ──► dense top-k retrieval
-                                                │
-                                                ▼
-                            grounded prompt ──► OpenRouter/DeepSeek
-                                                │
-                                                ▼
-                                    FastAPI ──► Streamlit
+```mermaid
+flowchart TD
+    PDF["data/raw/demo.pdf"] --> Parser["PyMuPDF parser"]
+    Parser --> Chunking["Token chunking<br/>tiktoken · cl100k_base"]
+    Chunking --> PassageEmbedding["Jina passage embeddings"]
+    PassageEmbedding --> Chroma[("ChromaDB")]
+
+    Question["User question"] --> QueryEmbedding["Jina query embedding"]
+    QueryEmbedding --> Retrieval["Dense top-k retrieval"]
+    Chroma --> Retrieval
+
+    Retrieval --> Prompt["Grounded prompt<br/>context + question"]
+    Prompt --> LLM["DeepSeek via OpenRouter"]
+    LLM --> API["FastAPI · /chat"]
+    API --> UI["Streamlit chat"]
 ```
 
 Pipeline chỉ dùng dense search. Reranking, BM25 và các RAG framework đóng gói
