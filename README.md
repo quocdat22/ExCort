@@ -23,6 +23,19 @@ phases, set `JINA_API_KEY` and `OPENROUTER_API_KEY` in `.env`.
 - `data/processed/`: generated chunks (ignored by Git)
 - `data/chroma/`: local Chroma database (ignored by Git)
 
+## Version control
+
+Development happens on `main`, with one focused commit per completed phase. Local
+secrets (`.env`) and generated artifacts (`data/processed/`, `data/chroma/`) are
+ignored; the supplied source PDF is versioned so ingestion is reproducible.
+
+To publish this repository after creating an empty GitHub repository:
+
+```bash
+git remote add origin <your-github-repository-url>
+git push -u origin main
+```
+
 ## Future work
 
 - Add reranking with Jina Reranker.
@@ -31,4 +44,3 @@ phases, set `JINA_API_KEY` and `OPENROUTER_API_KEY` in `.env`.
 - Store chat history in SQLite.
 - Package deployment with Docker.
 - Add BM25 for hybrid search.
-
