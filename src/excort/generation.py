@@ -64,6 +64,7 @@ class OpenRouterClient:
         *,
         timeout: float = 120.0,
         max_tokens: int = 500,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         if not api_key.strip():
             raise ValueError("OPENROUTER_API_KEY is required")
@@ -71,6 +72,7 @@ class OpenRouterClient:
         self.model = model
         self.timeout = timeout
         self.max_tokens = max_tokens
+        self.transport = transport
 
     def generate(self, prompt: FinalPrompt) -> str:
         """Generate one grounded answer using OpenRouter Chat Completions."""
@@ -87,7 +89,7 @@ class OpenRouterClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-        with httpx.Client(timeout=self.timeout) as client:
+        with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
             response = client.post(OPENROUTER_CHAT_URL, headers=headers, json=payload)
             response.raise_for_status()
         return self._parse_response(response.json())

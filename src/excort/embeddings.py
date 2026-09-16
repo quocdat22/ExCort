@@ -19,6 +19,7 @@ class JinaEmbeddingClient:
         *,
         batch_size: int = 16,
         timeout: float = 60.0,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         if not api_key.strip():
             raise ValueError("JINA_API_KEY is required")
@@ -28,6 +29,8 @@ class JinaEmbeddingClient:
         self.model = model
         self.batch_size = batch_size
         self.timeout = timeout
+        # Injectable transport keeps unit tests offline while exercising real payloads.
+        self.transport = transport
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         """Embed index content with Jina's passage-specific retrieval adapter."""
@@ -69,7 +72,7 @@ class JinaEmbeddingClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-        with httpx.Client(timeout=self.timeout) as client:
+        with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
             response = client.post(JINA_EMBEDDINGS_URL, headers=headers, json=payload)
             response.raise_for_status()
         return self._parse_response(response.json(), expected_count=len(texts))
