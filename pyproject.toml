@@ -1,0 +1,42 @@
+[project]
+name = "excort"
+version = "0.1.0"
+description = "Minimal PDF-only RAG chatbot"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "chromadb>=1.0,<2",
+    "fastapi>=0.115,<1",
+    "httpx>=0.28,<1",
+    "pydantic-settings>=2.7,<3",
+    "pymupdf>=1.25,<2",
+    "streamlit>=1.41,<2",
+    "tiktoken>=0.9,<1",
+    "uvicorn>=0.34,<1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "ruff>=0.9,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/excort"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
