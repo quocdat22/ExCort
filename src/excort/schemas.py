@@ -36,3 +36,13 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
     collection: str
     record_count: int = Field(ge=0)
+
+
+class DocumentUploadResponse(BaseModel):
+    """Summary of a PDF that was successfully added to the index."""
+
+    document_id: str
+    filename: str
+    size_bytes: int = Field(gt=0)
+    indexed_page_count: int = Field(gt=0)
+    chunk_count: int = Field(gt=0)

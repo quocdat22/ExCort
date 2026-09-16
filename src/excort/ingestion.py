@@ -30,6 +30,7 @@ class Chunk:
     token_start: int
     token_end: int
     token_count: int
+    document_id: str | None = None
 
 
 def parse_pdf(pdf_path: Path) -> list[PageText]:
@@ -61,6 +62,7 @@ def chunk_pages(
     source: Path,
     chunk_size: int,
     chunk_overlap: int,
+    document_id: str | None = None,
 ) -> list[Chunk]:
     """Split each page into fixed token windows with overlap.
 
@@ -82,7 +84,8 @@ def chunk_pages(
         for token_start in range(0, len(token_ids), step):
             token_end = min(token_start + chunk_size, len(token_ids))
             chunk_token_ids = token_ids[token_start:token_end]
-            chunk_id = f"{source.stem}-p{page.page_number:04d}-c{page_chunk_index:04d}"
+            id_prefix = document_id or source.stem
+            chunk_id = f"{id_prefix}-p{page.page_number:04d}-c{page_chunk_index:04d}"
             chunks.append(
                 Chunk(
                     id=chunk_id,
@@ -95,6 +98,7 @@ def chunk_pages(
                     token_start=token_start,
                     token_end=token_end,
                     token_count=len(chunk_token_ids),
+                    document_id=document_id,
                 )
             )
             page_chunk_index += 1

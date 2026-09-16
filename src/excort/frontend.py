@@ -6,7 +6,12 @@ import httpx
 import streamlit as st
 
 from excort.config import settings
-from excort.schemas import ChatResponse, HealthResponse, SourceResponse
+from excort.schemas import (
+    ChatResponse,
+    DocumentUploadResponse,
+    HealthResponse,
+    SourceResponse,
+)
 
 
 class ChatMessage(TypedDict):
@@ -35,6 +40,29 @@ def ask_backend(question: str) -> ChatResponse:
     return ChatResponse.model_validate(response.json())
 
 
+def upload_document(filename: str, content: bytes) -> DocumentUploadResponse:
+    """Upload one PDF and validate the completed indexing summary."""
+    response = httpx.post(
+        f"{settings.backend_url}/documents",
+        files={"file": (filename, content, "application/pdf")},
+        timeout=300.0,
+    )
+    response.raise_for_status()
+    return DocumentUploadResponse.model_validate(response.json())
+
+
+def backend_error_message(error: httpx.HTTPError | ValueError) -> str:
+    """Prefer the API's safe detail message over a verbose HTTP exception."""
+    if isinstance(error, httpx.HTTPStatusError):
+        try:
+            detail = error.response.json().get("detail")
+        except ValueError:
+            detail = None
+        if isinstance(detail, str) and detail:
+            return detail
+    return str(error)
+
+
 def render_sources(sources: list[SourceResponse]) -> None:
     """Keep evidence available without overwhelming the main conversation."""
     if not sources:
@@ -56,6 +84,30 @@ def render_app() -> None:
 
     with st.sidebar:
         st.header("System status")
+        uploaded_file = st.file_uploader(
+            "Add a PDF document",
+            type=["pdf"],
+            help=f"Text-based PDF, up to {settings.max_upload_size_mb} MB.",
+        )
+        if st.button(
+            "Upload & index",
+            disabled=uploaded_file is None,
+            use_container_width=True,
+        ):
+            try:
+                with st.spinner("Parsing, embedding, and indexing the PDF..."):
+                    uploaded = upload_document(
+                        uploaded_file.name,
+                        uploaded_file.getvalue(),
+                    )
+                st.success(
+                    f"Indexed {uploaded.filename}: "
+                    f"{uploaded.indexed_page_count} pages, "
+                    f"{uploaded.chunk_count} chunks"
+                )
+            except (httpx.HTTPError, ValueError) as error:
+                st.error(f"Upload failed: {backend_error_message(error)}")
+
         try:
             health = get_backend_health()
             st.success(f"Backend ready · {health.record_count} chunks")

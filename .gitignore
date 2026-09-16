@@ -9,4 +9,5 @@ htmlcov/
 data/chroma/
 data/processed/
 data/raw/demo.pdf
+data/raw/uploads/
 .streamlit/secrets.toml

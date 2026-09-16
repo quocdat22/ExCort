@@ -1,6 +1,6 @@
 # ExCort
 
-ExCort là chatbot Retrieval-Augmented Generation (RAG) ở mức MVP dành cho một
+ExCort là chatbot Retrieval-Augmented Generation (RAG) ở mức MVP dành cho các
 tài liệu PDF. Dự án tự triển khai toàn bộ pipeline parsing, chunking, embedding,
 retrieval và generation, không sử dụng LangChain hoặc LlamaIndex.
 
@@ -13,6 +13,7 @@ retrieval và generation, không sử dụng LangChain hoặc LlamaIndex.
 - Sinh câu trả lời có nguồn trang bằng `deepseek/deepseek-v4-flash-0731` qua
   OpenRouter.
 - Cung cấp REST API bằng FastAPI và giao diện chat bằng Streamlit.
+- Upload và thêm nhiều PDF text-based vào chỉ mục ngay từ giao diện.
 - Có script quan sát riêng cho từng phase và bộ test chạy offline với mock API.
 
 ## Kiến trúc
@@ -103,6 +104,7 @@ tránh commit khóa bí mật, dữ liệu có bản quyền hoặc artifact sin
 | `CHUNK_SIZE` | `500` | Số token tối đa mỗi chunk |
 | `CHUNK_OVERLAP` | `50` | Số token overlap giữa hai chunk cùng trang |
 | `TOP_K` | `4` | Số chunk đưa vào prompt |
+| `MAX_UPLOAD_SIZE_MB` | `5` | Dung lượng tối đa của mỗi PDF upload (MiB) |
 | `BACKEND_URL` | `http://127.0.0.1:8000` | URL FastAPI mà frontend gọi |
 
 `CHUNK_OVERLAP` phải nhỏ hơn `CHUNK_SIZE`.
@@ -180,6 +182,21 @@ curl -X POST http://127.0.0.1:8000/chat \
 Response gồm `question`, `answer` và danh sách `sources`. Mỗi source chứa chunk
 ID, đường dẫn tài liệu, số trang, similarity và nội dung chunk dùng làm bằng chứng.
 `top_k` là tùy chọn và phải nằm trong khoảng 1–20.
+
+### `POST /documents`
+
+Upload một PDF text-based và thêm vào collection hiện tại:
+
+```bash
+curl -X POST http://127.0.0.1:8000/documents \
+  -F 'file=@document.pdf;type=application/pdf'
+```
+
+Response `201 Created` chứa mã tài liệu SHA-256, tên file, dung lượng, số trang
+có text và số chunk đã lập chỉ mục. API trả `413` nếu file vượt
+`MAX_UPLOAD_SIZE_MB`, `415` nếu không phải PDF, `422` nếu PDF đặt mật khẩu hoặc
+không có text layer, và `409` nếu nội dung đã tồn tại. PDF scan hoàn toàn cần OCR
+và chưa được hỗ trợ.
 
 ## Kiểm thử và code quality
 

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=500, gt=0)
     chunk_overlap: int = Field(default=50, ge=0)
     top_k: int = Field(default=4, gt=0)
+    max_upload_size_mb: int = Field(default=5, gt=0)
     backend_url: str = "http://127.0.0.1:8000"
 
     @model_validator(mode="after")

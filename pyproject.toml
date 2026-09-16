@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.115,<1",
     "httpx>=0.28,<1",
     "pydantic-settings>=2.7,<3",
+    "python-multipart>=0.0.20,<1",
     "pymupdf>=1.25,<2",
     "streamlit>=1.41,<2",
     "tiktoken>=0.9,<1",
@@ -39,4 +40,3 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-
