@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Annotated
 
 import httpx
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
 
 from excort.config import settings
 from excort.embeddings import JinaEmbeddingClient
@@ -23,11 +23,19 @@ from excort.retrieval import DenseRetriever
 from excort.schemas import (
     ChatRequest,
     ChatResponse,
+    DocumentChunkResponse,
+    DocumentDetailResponse,
+    DocumentListResponse,
+    DocumentSummaryResponse,
     DocumentUploadResponse,
     HealthResponse,
     SourceResponse,
 )
-from excort.vector_store import get_collection
+from excort.vector_store import (
+    DocumentCatalog,
+    DocumentNotFoundError,
+    get_collection,
+)
 
 app = FastAPI(
     title="ExCort API",
@@ -93,6 +101,11 @@ def get_document_indexer() -> DocumentIndexer:
     )
 
 
+def get_document_catalog() -> DocumentCatalog:
+    """Build the read-only view over documents stored in Chroma."""
+    return DocumentCatalog(settings.chroma_path, settings.chroma_collection)
+
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     """Confirm that the API can open the generated Chroma collection."""
@@ -107,6 +120,77 @@ def health() -> HealthResponse:
         status="ok",
         collection=settings.chroma_collection,
         record_count=collection.count(),
+    )
+
+
+@app.get("/documents", response_model=DocumentListResponse)
+def list_documents(
+    catalog: Annotated[DocumentCatalog, Depends(get_document_catalog)],
+) -> DocumentListResponse:
+    """List documents represented by chunks in the vector collection."""
+    try:
+        documents = catalog.list_documents()
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Vector collection is unavailable; run Phase 2 first",
+        ) from error
+    summaries = [
+        DocumentSummaryResponse(
+            document_id=document.document_id,
+            filename=document.filename,
+            indexed_page_count=document.indexed_page_count,
+            chunk_count=document.chunk_count,
+        )
+        for document in documents
+    ]
+    return DocumentListResponse(total=len(summaries), documents=summaries)
+
+
+@app.get("/documents/{document_id}", response_model=DocumentDetailResponse)
+def get_document(
+    document_id: str,
+    catalog: Annotated[DocumentCatalog, Depends(get_document_catalog)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> DocumentDetailResponse:
+    """Return an ordered, paginated view of one document's chunks."""
+    try:
+        result = catalog.get_document(
+            document_id,
+            page=page,
+            page_size=page_size,
+        )
+    except DocumentNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Vector collection is unavailable; run Phase 2 first",
+        ) from error
+    return DocumentDetailResponse(
+        document_id=result.document.document_id,
+        filename=result.document.filename,
+        indexed_page_count=result.document.indexed_page_count,
+        chunk_count=result.document.chunk_count,
+        page=result.page,
+        page_size=result.page_size,
+        total_pages=result.total_pages,
+        chunks=[
+            DocumentChunkResponse(
+                chunk_id=chunk.chunk_id,
+                page_number=chunk.page_number,
+                chunk_index=chunk.chunk_index,
+                token_start=chunk.token_start,
+                token_end=chunk.token_end,
+                token_count=chunk.token_count,
+                text=chunk.text,
+            )
+            for chunk in result.chunks
+        ],
     )
 
 

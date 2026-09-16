@@ -2,11 +2,22 @@
 
 from fastapi.testclient import TestClient
 
-from excort.api import app, get_document_indexer, get_rag_chain
+from excort.api import (
+    app,
+    get_document_catalog,
+    get_document_indexer,
+    get_rag_chain,
+)
 from excort.generation import FinalPrompt
 from excort.indexing import IndexedDocument, UploadTooLargeError
 from excort.rag import RagResponse
 from excort.retrieval import RetrievedChunk
+from excort.vector_store import (
+    DocumentNotFoundError,
+    StoredChunk,
+    StoredDocument,
+    StoredDocumentPage,
+)
 
 
 class FakeRagChain:
@@ -100,3 +111,122 @@ def test_upload_endpoint_maps_oversize_error_to_413() -> None:
 
     assert response.status_code == 413
     assert response.json()["detail"] == "PDF exceeds the configured limit"
+
+
+class FakeDocumentCatalog:
+    document = StoredDocument(
+        document_id="doc-1",
+        filename="guide.pdf",
+        indexed_page_count=2,
+        chunk_count=3,
+    )
+
+    def list_documents(self) -> list[StoredDocument]:
+        return [self.document]
+
+    def get_document(
+        self,
+        document_id: str,
+        *,
+        page: int,
+        page_size: int,
+    ) -> StoredDocumentPage:
+        if document_id != self.document.document_id:
+            raise DocumentNotFoundError(document_id)
+        assert page_size == 1
+        return StoredDocumentPage(
+            document=self.document,
+            page=page,
+            page_size=page_size,
+            total_pages=3,
+            chunks=[
+                StoredChunk(
+                    chunk_id="doc-1-p0001-c0000",
+                    page_number=1,
+                    chunk_index=0,
+                    token_start=0,
+                    token_end=10,
+                    token_count=10,
+                    text="Inspectable chunk",
+                )
+            ],
+        )
+
+
+def test_list_documents_endpoint_returns_summaries() -> None:
+    app.dependency_overrides[get_document_catalog] = lambda: FakeDocumentCatalog()
+    try:
+        with TestClient(app) as client:
+            response = client.get("/documents")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total": 1,
+        "documents": [
+            {
+                "document_id": "doc-1",
+                "filename": "guide.pdf",
+                "indexed_page_count": 2,
+                "chunk_count": 3,
+            }
+        ],
+    }
+
+
+def test_document_detail_endpoint_returns_paginated_chunks() -> None:
+    app.dependency_overrides[get_document_catalog] = lambda: FakeDocumentCatalog()
+    try:
+        with TestClient(app) as client:
+            response = client.get("/documents/doc-1?page=2&page_size=1")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 2
+    assert payload["total_pages"] == 3
+    assert payload["chunks"][0]["text"] == "Inspectable chunk"
+
+
+def test_document_detail_endpoint_returns_404_for_unknown_id() -> None:
+    app.dependency_overrides[get_document_catalog] = lambda: FakeDocumentCatalog()
+    try:
+        with TestClient(app) as client:
+            response = client.get("/documents/missing?page_size=1")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Document not found"
+
+
+def test_document_detail_endpoint_validates_pagination() -> None:
+    app.dependency_overrides[get_document_catalog] = lambda: FakeDocumentCatalog()
+    try:
+        with TestClient(app) as client:
+            response = client.get("/documents/doc-1?page=0&page_size=101")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+class UnavailableDocumentCatalog:
+    def list_documents(self) -> list[StoredDocument]:
+        raise RuntimeError("collection unavailable")
+
+
+def test_list_documents_endpoint_maps_collection_error_to_503() -> None:
+    app.dependency_overrides[get_document_catalog] = lambda: (
+        UnavailableDocumentCatalog()
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.get("/documents")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json()["detail"].startswith("Vector collection is unavailable")

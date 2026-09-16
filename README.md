@@ -198,6 +198,43 @@ có text và số chunk đã lập chỉ mục. API trả `413` nếu file vư�
 không có text layer, và `409` nếu nội dung đã tồn tại. PDF scan hoàn toàn cần OCR
 và chưa được hỗ trợ.
 
+### `GET /documents`
+
+Liệt kê các tài liệu hiện có trong ChromaDB cùng số trang có text và số chunk:
+
+```bash
+curl http://127.0.0.1:8000/documents
+```
+
+```json
+{
+  "total": 1,
+  "documents": [
+    {
+      "document_id": "84e021a4...",
+      "filename": "document.pdf",
+      "indexed_page_count": 12,
+      "chunk_count": 18
+    }
+  ]
+}
+```
+
+### `GET /documents/{document_id}`
+
+Xem nội dung và metadata của từng chunk, được sắp theo trang và phân trang với
+`page` mặc định là `1`, `page_size` mặc định là `20` và tối đa là `100`:
+
+```bash
+curl 'http://127.0.0.1:8000/documents/84e021a4...?page=1&page_size=20'
+```
+
+Response gồm thông tin tài liệu, `total_pages` và danh sách `chunks`. Mỗi chunk
+có ID, số trang, thứ tự trong trang, khoảng token, số token và toàn bộ nội dung.
+ID không tồn tại trả `404`; tham số phân trang không hợp lệ trả `422`.
+
+Frontend cung cấp cùng chức năng trong tab **Documents**, bên cạnh tab chat.
+
 ## Kiểm thử và code quality
 
 Chạy toàn bộ quality gate offline:

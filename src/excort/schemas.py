@@ -46,3 +46,40 @@ class DocumentUploadResponse(BaseModel):
     size_bytes: int = Field(gt=0)
     indexed_page_count: int = Field(gt=0)
     chunk_count: int = Field(gt=0)
+
+
+class DocumentSummaryResponse(BaseModel):
+    """A summary of one document represented in the vector collection."""
+
+    document_id: str
+    filename: str
+    indexed_page_count: int = Field(gt=0)
+    chunk_count: int = Field(gt=0)
+
+
+class DocumentListResponse(BaseModel):
+    """All documents currently represented in the vector collection."""
+
+    total: int = Field(ge=0)
+    documents: list[DocumentSummaryResponse]
+
+
+class DocumentChunkResponse(BaseModel):
+    """Inspectable content and metadata for one indexed chunk."""
+
+    chunk_id: str
+    page_number: int = Field(gt=0)
+    chunk_index: int = Field(ge=0)
+    token_start: int = Field(ge=0)
+    token_end: int = Field(gt=0)
+    token_count: int = Field(gt=0)
+    text: str
+
+
+class DocumentDetailResponse(DocumentSummaryResponse):
+    """One document and a paginated slice of its chunks."""
+
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1, le=100)
+    total_pages: int = Field(ge=1)
+    chunks: list[DocumentChunkResponse]
